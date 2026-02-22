@@ -3,10 +3,53 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QComboBox,
                              QSlider, QSpinBox, QTabWidget, QGroupBox, QFileDialog,
                              QScrollArea, QSplitter, QFrame, QSizePolicy)
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette
+from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette, QPixmap
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+
+# ==========================================
+# --- CUSTOM WIDGETS ---
+# ==========================================
+
+class ImageLabel(QLabel):
+    """A custom QLabel that automatically scales its pixmap to fit its size while preserving aspect ratio."""
+
+    def __init__(self, text=""):
+        super().__init__(text)
+        self.original_pixmap = None
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # --- THE FIX ---
+        # This stops the infinite growth loop by telling the layout to ignore the image's inherent size
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.setMinimumSize(100, 100)  # Prevents the label from completely collapsing
+
+    def set_image(self, file_path):
+        pixmap = QPixmap(file_path)
+        if not pixmap.isNull():
+            self.original_pixmap = pixmap
+            self.update_image()
+        else:
+            self.setText("❌ Failed to load image.")
+            self.original_pixmap = None
+
+    def update_image(self):
+        if self.original_pixmap and not self.original_pixmap.isNull():
+            # Scale the image to fit the label's current boundaries
+            scaled_pixmap = self.original_pixmap.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            super().setPixmap(scaled_pixmap)
+
+    def resizeEvent(self, event):
+        """Re-scale the image whenever the window or splitter is resized."""
+        if self.original_pixmap:
+            self.update_image()
+        super().resizeEvent(event)
 
 
 # ==========================================
@@ -181,7 +224,8 @@ class ComputerVisionApp(QMainWindow):
         file_group = self.create_group_box("File & History")
         l = QVBoxLayout()
         btn_load = QPushButton("📂 Load Image")
-        btn_load.clicked.connect(self.load_image)
+        # Connect to handle_image_upload passing the target label
+        btn_load.clicked.connect(lambda: self.handle_image_upload(self.lbl_orig))
         btn_undo = QPushButton("↩ Undo Last Action")
         btn_undo.setObjectName("SecondaryBtn")
         l.addWidget(btn_load)
@@ -193,7 +237,6 @@ class ComputerVisionApp(QMainWindow):
         noise_group = self.create_group_box("Add Noise")
         l = QVBoxLayout()
         self.combo_noise = QComboBox()
-        #  Uniform, Gaussian, Salt & Pepper
         self.combo_noise.addItems(["Uniform Noise", "Gaussian Noise", "Salt & Pepper"])
         self.slider_noise = QSlider(Qt.Orientation.Horizontal)
         self.slider_noise.setRange(0, 100)
@@ -210,7 +253,6 @@ class ComputerVisionApp(QMainWindow):
         filter_group = self.create_group_box("Spatial Filters (Smoothing)")
         l = QVBoxLayout()
         self.combo_filter = QComboBox()
-        #  Average, Gaussian, Median
         self.combo_filter.addItems(["Average Filter", "Gaussian Filter", "Median Filter"])
         self.spin_kernel = QSpinBox()
         self.spin_kernel.setRange(3, 31)
@@ -229,7 +271,6 @@ class ComputerVisionApp(QMainWindow):
         edge_group = self.create_group_box("Edge Detection")
         l = QVBoxLayout()
         self.combo_edge = QComboBox()
-        #  Sobel, Roberts, Prewitt, Canny
         self.combo_edge.addItems(["Sobel", "Roberts", "Prewitt", "Canny"])
         btn_edge = QPushButton("Detect Edges")
         l.addWidget(QLabel("Method:"))
@@ -242,7 +283,6 @@ class ComputerVisionApp(QMainWindow):
         freq_group = self.create_group_box("Frequency Domain")
         l = QVBoxLayout()
         self.combo_freq = QComboBox()
-        #  High pass and low pass
         self.combo_freq.addItems(["Low Pass (Blur)", "High Pass (Sharpen)"])
         btn_freq = QPushButton("Apply FFT Filter")
         l.addWidget(self.combo_freq)
@@ -253,13 +293,12 @@ class ComputerVisionApp(QMainWindow):
         # 6. Global Ops
         ops_group = self.create_group_box("Enhancement")
         l = QVBoxLayout()
-        # [cite: 302, 303] Equalize, Normalize
         l.addWidget(QPushButton("Equalize Histogram"))
         l.addWidget(QPushButton("Normalize Image"))
         ops_group.setLayout(l)
         controls_layout.addWidget(ops_group)
 
-        controls_layout.addStretch()  # Push everything up
+        controls_layout.addStretch()
         scroll_area.setWidget(controls_widget)
 
         # --- RIGHT: DISPLAY AREA ---
@@ -270,18 +309,17 @@ class ComputerVisionApp(QMainWindow):
         img_container = QWidget()
         img_layout = QHBoxLayout(img_container)
 
-        self.lbl_orig = QLabel("Original\n(Drop Image Here)")
+        # Use Custom ImageLabel
+        self.lbl_orig = ImageLabel("Original\n(Drop Image Here)")
         self.lbl_orig.setObjectName("ImageDisplay")
-        self.lbl_orig.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.lbl_proc = QLabel("Processed\nResult")
+        self.lbl_proc = ImageLabel("Processed\nResult")
         self.lbl_proc.setObjectName("ImageDisplay")
-        self.lbl_proc.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         img_layout.addWidget(self.lbl_orig)
         img_layout.addWidget(self.lbl_proc)
 
-        # Histogram Canvas [cite: 306] (R, G, B, CDF)
+        # Histogram Canvas
         self.figure = Figure(figsize=(5, 3), dpi=100)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setMinimumHeight(250)
@@ -292,7 +330,7 @@ class ComputerVisionApp(QMainWindow):
         # Add to Splitter
         splitter.addWidget(scroll_area)
         splitter.addWidget(display_widget)
-        splitter.setSizes([300, 900])  # Initial widths
+        splitter.setSizes([300, 900])
 
         layout.addWidget(splitter)
         self.tabs.addTab(tab, "Image Processor")
@@ -309,14 +347,18 @@ class ComputerVisionApp(QMainWindow):
 
         grp_a = self.create_group_box("Image A (Low Pass)")
         l_a = QVBoxLayout()
-        l_a.addWidget(QPushButton("Load Image A"))
+        btn_load_a = QPushButton("Load Image A")
+        btn_load_a.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
+        l_a.addWidget(btn_load_a)
         l_a.addWidget(QLabel("Cutoff Frequency:"))
         l_a.addWidget(QSlider(Qt.Orientation.Horizontal))
         grp_a.setLayout(l_a)
 
         grp_b = self.create_group_box("Image B (High Pass)")
         l_b = QVBoxLayout()
-        l_b.addWidget(QPushButton("Load Image B"))
+        btn_load_b = QPushButton("Load Image B")
+        btn_load_b.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
+        l_b.addWidget(btn_load_b)
         l_b.addWidget(QLabel("Cutoff Frequency:"))
         l_b.addWidget(QSlider(Qt.Orientation.Horizontal))
         grp_b.setLayout(l_b)
@@ -333,21 +375,20 @@ class ComputerVisionApp(QMainWindow):
         display = QWidget()
         d_layout = QVBoxLayout(display)
 
-        # Top: Inputs
+        # Top: Inputs using Custom ImageLabel
         top_row = QHBoxLayout()
-        self.lbl_hybrid_a = QLabel("Img A");
+        self.lbl_hybrid_a = ImageLabel("Img A")
         self.lbl_hybrid_a.setObjectName("ImageDisplay")
-        self.lbl_hybrid_b = QLabel("Img B");
+
+        self.lbl_hybrid_b = ImageLabel("Img B")
         self.lbl_hybrid_b.setObjectName("ImageDisplay")
-        self.lbl_hybrid_a.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_hybrid_b.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         top_row.addWidget(self.lbl_hybrid_a)
         top_row.addWidget(self.lbl_hybrid_b)
 
-        # Bottom: Result
-        self.lbl_hybrid_res = QLabel("Hybrid Result");
+        # Bottom: Result using Custom ImageLabel
+        self.lbl_hybrid_res = ImageLabel("Hybrid Result")
         self.lbl_hybrid_res.setObjectName("ImageDisplay")
-        self.lbl_hybrid_res.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_hybrid_res.setStyleSheet("border: 2px solid #007acc;")
 
         d_layout.addLayout(top_row)
@@ -394,11 +435,29 @@ class ComputerVisionApp(QMainWindow):
 
         self.canvas.draw()
 
-    def load_image(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg)")
-        if file_name:
-            print(f"Loading {file_name}")
-            # Backend hook: Display image on self.lbl_orig
+    def handle_image_upload(self, target_label):
+        """Opens a file dialog, shows a loading state, and loads the image into the target label."""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+
+        if file_path:
+            # Show the waiting cursor globally
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+
+            # Clear previous image and show loading text
+            target_label.clear()
+            target_label.original_pixmap = None
+            target_label.setText("⏳ Loading...\nPlease wait")
+
+            # Force the UI to process the text update immediately
+            QApplication.processEvents()
+
+            # Simulate a brief delay to show the loader, then load the image
+            QTimer.singleShot(600, lambda: self.finalize_image_load(target_label, file_path))
+
+    def finalize_image_load(self, target_label, file_path):
+        """Sets the image on the label and removes the loading cursor."""
+        target_label.set_image(file_path)
+        QApplication.restoreOverrideCursor()
 
 
 if __name__ == "__main__":
