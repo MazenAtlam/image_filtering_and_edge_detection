@@ -391,8 +391,10 @@ class ComputerVisionApp(QMainWindow):
         self.lbl_hybrid_res.setObjectName("ImageDisplay")
         self.lbl_hybrid_res.setStyleSheet("border: 2px solid #007acc;")
 
-        d_layout.addLayout(top_row)
-        d_layout.addWidget(self.lbl_hybrid_res, stretch=2)
+        # --- THE FIX: Equal Stretch Factors ---
+        # By giving both a stretch of 1, they perfectly split the vertical space 50/50
+        d_layout.addLayout(top_row, stretch=1)
+        d_layout.addWidget(self.lbl_hybrid_res, stretch=1)
 
         layout.addWidget(controls)
         layout.addWidget(display)
@@ -466,3 +468,4 @@ if __name__ == "__main__":
     window = ComputerVisionApp()
     window.show()
     sys.exit(app.exec())
+    
