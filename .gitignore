@@ -1,0 +1,80 @@
+# ==========================================
+# C++ & CMake Build Artifacts
+# ==========================================
+# Ignore the entire build directory (This is the most important one!)
+build/
+out/
+bin/
+
+# CMake generated files (just in case they leak outside the build folder)
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Pybind11 FetchContent downloads
+_deps/
+
+# Compiled C++ object files and libraries
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exe
+
+# ==========================================
+# Python & PyQt
+# ==========================================
+# Compiled Python modules (including your compiled C++ pybind11 module)
+*.pyd
+*.pyc
+*.pyo
+__pycache__/
+
+# Python virtual environments (if you set one up for PyQt6)
+venv/
+env/
+.venv/
+.env/
+
+# Python package metadata
+*.egg-info/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==========================================
+# Computer Vision / Project Data
+# ==========================================
+# Ignore large media files, datasets, or models used for processing
+datasets/
+models/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+*.weights
+*.h5
+*.onnx
+
+# ==========================================
+# OS & IDE Files
+# ==========================================
+# Windows
+Thumbs.db
+Desktop.ini
+
+# IDEs (VS Code, Visual Studio, CLion, etc.)
+.vscode/
+.idea/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.suo
+*.user
