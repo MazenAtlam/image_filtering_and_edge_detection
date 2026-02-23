@@ -1,4 +1,4 @@
-// 2. Make the Hybrid Image
+// Make the Hybrid Image
     static cv::Mat createHybridImage(const cv::Mat& img_a, const cv::Mat& img_b, int radius_a, int radius_b) {
         cv::Mat b_resized;
         
