@@ -21,7 +21,7 @@ private:
     }
 
 public:
-    // 1. Apply the Frequency domain Filters
+    // Apply the Frequency domain Filters
     static cv::Mat applyFFTFilter(const cv::Mat& image, const std::string& filter_type, int radius) {
         cv::Mat gray;
         if (image.channels() == 3) {
