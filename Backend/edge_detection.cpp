@@ -1,4 +1,4 @@
-// 3. Detect Edge using Canny mask
+// Detect Edge using Canny mask
     static cv::Mat detectEdgesCanny(const cv::Mat& image, double threshold1 = 100, double threshold2 = 200) {
         cv::Mat gray, edges;
         
