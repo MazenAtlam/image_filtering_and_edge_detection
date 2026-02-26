@@ -5,6 +5,8 @@
 build/
 out/
 bin/
+test/
+pybind11/
 
 # CMake generated files (just in case they leak outside the build folder)
 CMakeCache.txt
