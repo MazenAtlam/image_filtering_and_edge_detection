@@ -1,3 +1,12 @@
+#include <opencv2/opencv.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include "binding_utils.h"
+#include <string>
+
+namespace py = pybind11;
+
+class FrequencyFilters {
 private:
     // Helper function to rearrange the quadrants of Fourier image
     static void fftShift(cv::Mat& magI) {
@@ -34,6 +43,11 @@ public:
         cv::Mat padded;
         int m = cv::getOptimalDFTSize(gray.rows);
         int n = cv::getOptimalDFTSize(gray.cols);
+        
+        // Ensure m and n are even so fftShift doesn't crop the matrix
+        if (m % 2 != 0) m++;
+        if (n % 2 != 0) n++;
+        
         cv::copyMakeBorder(gray, padded, 0, m - gray.rows, 0, n - gray.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
 
         // Make place for both the complex and the real values
@@ -78,3 +92,19 @@ public:
         
         return result;
     }
+};
+
+// Pybind11 wrapper
+py::array_t<unsigned char> apply_fft_wrapper(py::array_t<unsigned char> img, const std::string& filter_type, int radius) {
+    auto mat = numpy_to_mat(img);
+    auto res = FrequencyFilters::applyFFTFilter(mat, filter_type, radius);
+    return mat_to_numpy(res);
+}
+
+#ifndef FREQ_DONT_BIND
+PYBIND11_MODULE(freq_backend, m) {
+    m.doc() = "Frequency domain filtering C++ backend";
+    m.def("apply_fft", &apply_fft_wrapper, "Apply Low-pass or High-pass FFT filter",
+          py::arg("image"), py::arg("filter_type"), py::arg("radius"));
+}
+#endif
