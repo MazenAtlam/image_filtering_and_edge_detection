@@ -3,7 +3,7 @@
 #include <pybind11/numpy.h>
 #include "binding_utils.h"
 
-#define FREQ_DONT_BIND
+#define MAIN_BIND
 #include "frequency_filters.cpp"
 
 namespace py = pybind11;
@@ -53,8 +53,10 @@ py::array_t<unsigned char> create_hybrid_wrapper(py::array_t<unsigned char> img_
     return mat_to_numpy(res);
 }
 
+#ifndef MAIN_BIND
 PYBIND11_MODULE(hybrid_backend, m) {
     m.doc() = "Hybrid Image generation C++ backend";
     m.def("create_hybrid", &create_hybrid_wrapper, "Create hybrid image from two inputs",
           py::arg("img_a"), py::arg("img_b"), py::arg("radius_a"), py::arg("radius_b"));
 }
+#endif

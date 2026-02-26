@@ -100,8 +100,10 @@ py::array_t<unsigned char> add_noise_wrapper(py::array_t<unsigned char> img, con
     return mat_to_numpy(res);
 }
 
+#ifndef MAIN_BIND
 PYBIND11_MODULE(noise_backend, m) {
     m.doc() = "Noise generation C++ backend";
     m.def("add_noise", &add_noise_wrapper, "Add noise to an image dynamically based on type and intensity",
           py::arg("image"), py::arg("noise_type"), py::arg("intensity"));
 }
+#endif
