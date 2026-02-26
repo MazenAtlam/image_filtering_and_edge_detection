@@ -49,8 +49,10 @@ py::array_t<unsigned char> apply_filter_wrapper(py::array_t<unsigned char> img, 
     return mat_to_numpy(res);
 }
 
+#ifndef MAIN_BIND
 PYBIND11_MODULE(filter_backend, m) {
     m.doc() = "Spatial Domain filtering C++ backend";
     m.def("apply_filter", &apply_filter_wrapper, "Apply spatial filters based on type and kernel size",
           py::arg("image"), py::arg("filter_type"), py::arg("kernel_size"));
 }
+#endif

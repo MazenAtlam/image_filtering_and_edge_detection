@@ -3,31 +3,7 @@
 #include <pybind11/numpy.h>
 #include <cmath>
 
-namespace py = pybind11;
-
-// Helper to convert pybind11 numpy array to cv::Mat
-cv::Mat numpy_to_mat(py::array_t<unsigned char>& input) {
-    py::buffer_info buf = input.request();
-    int channels = buf.ndim == 3 ? buf.shape[2] : 1;
-    int type = channels == 3 ? CV_8UC3 : CV_8UC1;
-    cv::Mat mat(buf.shape[0], buf.shape[1], type, (unsigned char*)buf.ptr);
-    return mat;
-}
-
-// Helper to convert cv::Mat to pybind11 numpy array
-py::array_t<unsigned char> mat_to_numpy(const cv::Mat& input) {
-    if (input.channels() == 3) {
-        py::array_t<unsigned char> dst({ input.rows, input.cols, 3 });
-        py::buffer_info buf = dst.request();
-        std::memcpy(buf.ptr, input.data, input.total() * 3);
-        return dst;
-    } else {
-        py::array_t<unsigned char> dst({ input.rows, input.cols });
-        py::buffer_info buf = dst.request();
-        std::memcpy(buf.ptr, input.data, input.total());
-        return dst;
-    }
-}
+#include "binding_utils.h"
 
 // Detect Edge using Canny mask
     static cv::Mat detectEdgesCanny(const cv::Mat& image, double threshold1 = 100, double threshold2 = 200) {
@@ -160,6 +136,7 @@ py::array_t<unsigned char> roberts_wrapper(py::array_t<unsigned char> img) {
     return mat_to_numpy(res);
 }
 
+#ifndef MAIN_BIND
 PYBIND11_MODULE(edge_backend, m) {
     m.doc() = "Edge detection C++ backend";
     m.def("canny", &canny_wrapper, "Apply Canny edge detection");
@@ -167,3 +144,4 @@ PYBIND11_MODULE(edge_backend, m) {
     m.def("prewitt", &prewitt_wrapper, "Apply Prewitt edge detection");
     m.def("roberts", &roberts_wrapper, "Apply Roberts edge detection");
 }
+#endif

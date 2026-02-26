@@ -128,8 +128,10 @@ py::array_t<unsigned char> normalize_wrapper(py::array_t<unsigned char> img) {
     return mat_to_numpy(res);
 }
 
-PYBIND11_MODULE(enhance_image, m) {
+#ifndef MAIN_BIND
+PYBIND11_MODULE(enhance_backend, m) {
     m.doc() = "Image enhancement C++ backend";
     m.def("equalize", &equalize_wrapper, "Apply Histogram Equalization");
     m.def("normalize", &normalize_wrapper, "Apply Image Normalization");
 }
+#endif

@@ -101,7 +101,7 @@ py::array_t<unsigned char> apply_fft_wrapper(py::array_t<unsigned char> img, con
     return mat_to_numpy(res);
 }
 
-#ifndef FREQ_DONT_BIND
+#ifndef MAIN_BIND
 PYBIND11_MODULE(freq_backend, m) {
     m.doc() = "Frequency domain filtering C++ backend";
     m.def("apply_fft", &apply_fft_wrapper, "Apply Low-pass or High-pass FFT filter",

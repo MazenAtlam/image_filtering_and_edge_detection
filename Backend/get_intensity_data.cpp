@@ -85,9 +85,11 @@ py::array_t<int> cdf_wrapper(py::array_t<unsigned char> img) {
     return result;
 }
 
+#ifndef MAIN_BIND
 PYBIND11_MODULE(intensity_backend, m) {
     m.doc() = "Intensity data extraction C++ backend for Histogram and CDF";
     m.def("to_grayscale", &to_grayscale_wrapper, "Convert image to grayscale");
     m.def("calculate_histogram", &histogram_wrapper, "Calculate 256-bin histogram for each channel");
     m.def("calculate_cdf", &cdf_wrapper, "Calculate Cumulative Distribution Function for each channel");
 }
+#endif
