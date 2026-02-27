@@ -330,10 +330,46 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_edge = QComboBox()
         self.combo_edge.addItems(["Sobel", "Roberts", "Prewitt", "Canny"])
+
+        self.canny_controls_widget = QWidget()
+        canny_layout = QVBoxLayout(self.canny_controls_widget)
+        canny_layout.setContentsMargins(0, 0, 0, 0)
+        
+        t1_layout = QHBoxLayout()
+        t1_layout.addWidget(QLabel("Threshold 1:"))
+        self.lbl_canny_t1_val = QLabel("100")
+        t1_layout.addWidget(self.lbl_canny_t1_val)
+        t1_layout.addStretch()
+        
+        self.slider_canny_t1 = QSlider(Qt.Orientation.Horizontal)
+        self.slider_canny_t1.setRange(0, 500)
+        self.slider_canny_t1.setValue(100)
+        self.slider_canny_t1.valueChanged.connect(self.update_canny_t1_label)
+        
+        t2_layout = QHBoxLayout()
+        t2_layout.addWidget(QLabel("Threshold 2:"))
+        self.lbl_canny_t2_val = QLabel("200")
+        t2_layout.addWidget(self.lbl_canny_t2_val)
+        t2_layout.addStretch()
+        
+        self.slider_canny_t2 = QSlider(Qt.Orientation.Horizontal)
+        self.slider_canny_t2.setRange(0, 500)
+        self.slider_canny_t2.setValue(200)
+        self.slider_canny_t2.valueChanged.connect(self.update_canny_t2_label)
+        
+        canny_layout.addLayout(t1_layout)
+        canny_layout.addWidget(self.slider_canny_t1)
+        canny_layout.addLayout(t2_layout)
+        canny_layout.addWidget(self.slider_canny_t2)
+        
+        self.canny_controls_widget.setVisible(False)
+        self.combo_edge.currentTextChanged.connect(self.toggle_canny_sliders)
+
         btn_edge = QPushButton("Detect Edges")
         btn_edge.clicked.connect(self.apply_edge)
         l.addWidget(QLabel("Method:"))
         l.addWidget(self.combo_edge)
+        l.addWidget(self.canny_controls_widget)
         l.addWidget(btn_edge)
         edge_group.setLayout(l)
         controls_layout.addWidget(edge_group)
@@ -527,6 +563,18 @@ class ComputerVisionApp(QMainWindow):
     def update_cutoff_b_label(self, val):
         self.lbl_cutoff_b_val.setText(str(val))
 
+    def update_canny_t1_label(self, val):
+        self.lbl_canny_t1_val.setText(str(val))
+
+    def update_canny_t2_label(self, val):
+        self.lbl_canny_t2_val.setText(str(val))
+
+    def toggle_canny_sliders(self, text):
+        if text == "Canny":
+            self.canny_controls_widget.setVisible(True)
+        else:
+            self.canny_controls_widget.setVisible(False)
+
     def create_group_box(self, title):
         group = QGroupBox(title)
         return group
@@ -697,8 +745,9 @@ class ComputerVisionApp(QMainWindow):
         elif method == "Prewitt":
             res = backend.prewitt(self.current_image_np)
         else:
-            # Pass default Canny thresholds 100 and 200
-            res = backend.canny(self.current_image_np, 100.0, 200.0)
+            t1 = float(self.slider_canny_t1.value())
+            t2 = float(self.slider_canny_t2.value())
+            res = backend.canny(self.current_image_np, t1, t2)
             
         self.set_processed_image(res)
 
