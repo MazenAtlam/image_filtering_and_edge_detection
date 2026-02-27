@@ -276,13 +276,23 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_noise = QComboBox()
         self.combo_noise.addItems(["Uniform Noise", "Gaussian Noise", "Salt & Pepper"])
+        
+        noise_intensity_layout = QHBoxLayout()
+        noise_intensity_layout.addWidget(QLabel("Intensity:"))
+        self.lbl_noise_intensity_val = QLabel("0")
+        noise_intensity_layout.addWidget(self.lbl_noise_intensity_val)
+        noise_intensity_layout.addStretch()
+
         self.slider_noise = QSlider(Qt.Orientation.Horizontal)
         self.slider_noise.setRange(0, 100)
+        self.slider_noise.setValue(0)
+        self.slider_noise.valueChanged.connect(self.update_noise_intensity_label)
+
         btn_noise = QPushButton("Apply Noise")
         btn_noise.clicked.connect(self.apply_noise)
         l.addWidget(QLabel("Type:"))
         l.addWidget(self.combo_noise)
-        l.addWidget(QLabel("Intensity:"))
+        l.addLayout(noise_intensity_layout)
         l.addWidget(self.slider_noise)
         l.addWidget(btn_noise)
         noise_group.setLayout(l)
@@ -293,16 +303,24 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_filter = QComboBox()
         self.combo_filter.addItems(["Average Filter", "Gaussian Filter", "Median Filter"])
-        self.spin_kernel = QSpinBox()
-        self.spin_kernel.setRange(3, 31)
-        self.spin_kernel.setSingleStep(2)
-        self.spin_kernel.setValue(3)
+        kernel_layout = QHBoxLayout()
+        kernel_layout.addWidget(QLabel("Kernel Size:"))
+        self.lbl_kernel_val = QLabel("3")
+        kernel_layout.addWidget(self.lbl_kernel_val)
+        kernel_layout.addStretch()
+
+        self.slider_kernel = QSlider(Qt.Orientation.Horizontal)
+        self.slider_kernel.setRange(0, 14)
+        self.slider_kernel.setSingleStep(1)
+        self.slider_kernel.setValue(0)
+        self.slider_kernel.valueChanged.connect(self.update_kernel_label)
+
         btn_filter = QPushButton("Apply Filter")
         btn_filter.clicked.connect(self.apply_filter)
         l.addWidget(QLabel("Filter Type:"))
         l.addWidget(self.combo_filter)
-        l.addWidget(QLabel("Kernel Size (Odd):"))
-        l.addWidget(self.spin_kernel)
+        l.addLayout(kernel_layout)
+        l.addWidget(self.slider_kernel)
         l.addWidget(btn_filter)
         filter_group.setLayout(l)
         controls_layout.addWidget(filter_group)
@@ -325,9 +343,23 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_freq = QComboBox()
         self.combo_freq.addItems(["Low Pass (Blur)", "High Pass (Sharpen)"])
+        
+        freq_radius_layout = QHBoxLayout()
+        freq_radius_layout.addWidget(QLabel("Cutoff Radius:"))
+        self.lbl_freq_radius_val = QLabel("30")
+        freq_radius_layout.addWidget(self.lbl_freq_radius_val)
+        freq_radius_layout.addStretch()
+
+        self.slider_freq_radius = QSlider(Qt.Orientation.Horizontal)
+        self.slider_freq_radius.setRange(10, 200)
+        self.slider_freq_radius.setValue(30)
+        self.slider_freq_radius.valueChanged.connect(self.update_freq_radius_label)
+
         btn_freq = QPushButton("Apply FFT Filter")
         btn_freq.clicked.connect(self.apply_freq)
         l.addWidget(self.combo_freq)
+        l.addLayout(freq_radius_layout)
+        l.addWidget(self.slider_freq_radius)
         l.addWidget(btn_freq)
         freq_group.setLayout(l)
         controls_layout.addWidget(freq_group)
@@ -399,10 +431,19 @@ class ComputerVisionApp(QMainWindow):
         btn_load_a = QPushButton("Load Image A")
         btn_load_a.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
         l_a.addWidget(btn_load_a)
-        l_a.addWidget(QLabel("Cutoff Frequency:"))
+        
+        cutoff_a_layout = QHBoxLayout()
+        cutoff_a_layout.addWidget(QLabel("Cutoff Radius:"))
+        self.lbl_cutoff_a_val = QLabel("30")
+        cutoff_a_layout.addWidget(self.lbl_cutoff_a_val)
+        cutoff_a_layout.addStretch()
+
         self.slider_cutoff_a = QSlider(Qt.Orientation.Horizontal)
-        self.slider_cutoff_a.setRange(10, 100)
+        self.slider_cutoff_a.setRange(10, 200)
         self.slider_cutoff_a.setValue(30)
+        self.slider_cutoff_a.valueChanged.connect(self.update_cutoff_a_label)
+
+        l_a.addLayout(cutoff_a_layout)
         l_a.addWidget(self.slider_cutoff_a)
         grp_a.setLayout(l_a)
 
@@ -411,10 +452,19 @@ class ComputerVisionApp(QMainWindow):
         btn_load_b = QPushButton("Load Image B")
         btn_load_b.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
         l_b.addWidget(btn_load_b)
-        l_b.addWidget(QLabel("Cutoff Frequency:"))
+        
+        cutoff_b_layout = QHBoxLayout()
+        cutoff_b_layout.addWidget(QLabel("Cutoff Radius:"))
+        self.lbl_cutoff_b_val = QLabel("30")
+        cutoff_b_layout.addWidget(self.lbl_cutoff_b_val)
+        cutoff_b_layout.addStretch()
+
         self.slider_cutoff_b = QSlider(Qt.Orientation.Horizontal)
-        self.slider_cutoff_b.setRange(10, 100)
+        self.slider_cutoff_b.setRange(10, 200)
         self.slider_cutoff_b.setValue(30)
+        self.slider_cutoff_b.valueChanged.connect(self.update_cutoff_b_label)
+
+        l_b.addLayout(cutoff_b_layout)
         l_b.addWidget(self.slider_cutoff_b)
         grp_b.setLayout(l_b)
 
@@ -460,6 +510,22 @@ class ComputerVisionApp(QMainWindow):
     # ==========================================
     # --- HELPER FUNCTIONS ---
     # ==========================================
+
+    def update_kernel_label(self, val):
+        kernel_size = val * 2 + 3
+        self.lbl_kernel_val.setText(str(kernel_size))
+
+    def update_freq_radius_label(self, val):
+        self.lbl_freq_radius_val.setText(str(val))
+
+    def update_noise_intensity_label(self, val):
+        self.lbl_noise_intensity_val.setText(str(val))
+
+    def update_cutoff_a_label(self, val):
+        self.lbl_cutoff_a_val.setText(str(val))
+
+    def update_cutoff_b_label(self, val):
+        self.lbl_cutoff_b_val.setText(str(val))
 
     def create_group_box(self, title):
         group = QGroupBox(title)
@@ -614,9 +680,7 @@ class ComputerVisionApp(QMainWindow):
             return
             
         filter_type = self.combo_filter.currentText()
-        kernel_size = self.spin_kernel.value()
-        if kernel_size % 2 == 0:
-            kernel_size += 1 # Ensure odd
+        kernel_size = self.slider_kernel.value() * 2 + 3
             
         res = backend.apply_filter(self.current_image_np, filter_type, kernel_size)
         self.set_processed_image(res)
@@ -643,8 +707,7 @@ class ComputerVisionApp(QMainWindow):
             return
             
         filter_type = "low_pass" if "Low" in self.combo_freq.currentText() else "high_pass"
-        # Since we don't have a radius slider for single image freq filter in the UI yet, we can use a fixed default
-        radius = 30
+        radius = self.slider_freq_radius.value()
         res = backend.apply_fft(self.current_image_np, filter_type, radius)
         self.set_processed_image(res)
 
