@@ -4,9 +4,36 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QSlider, QSpinBox, QTabWidget, QGroupBox, QFileDialog,
                              QScrollArea, QSplitter, QFrame, QSizePolicy)
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette, QPixmap
+from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette, QPixmap, QImage
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import numpy as np
+import cv2
+import os
+
+try:
+    os.add_dll_directory("C:/msys64/mingw64/bin")
+except Exception:
+    pass
+import backend
+
+def numpy_to_qpixmap(img_array):
+    if img_array is None:
+        return QPixmap()
+    
+    # Needs to be a contiguous unmanaged array copied into Qt context to avoid GC crashes.
+    if len(img_array.shape) == 3:
+        h, w, c = img_array.shape
+        bytes_per_line = c * w
+        img_rgb = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+        qimg = QImage(img_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+        return QPixmap.fromImage(qimg.copy())
+    else:
+        h, w = img_array.shape
+        bytes_per_line = w
+        img_gray = np.ascontiguousarray(img_array)
+        qimg = QImage(img_gray.data, w, h, bytes_per_line, QImage.Format.Format_Grayscale8)
+        return QPixmap.fromImage(qimg.copy())
 
 
 # ==========================================
@@ -34,6 +61,11 @@ class ImageLabel(QLabel):
         else:
             self.setText("❌ Failed to load image.")
             self.original_pixmap = None
+            
+    def set_pixmap_data(self, pixmap):
+        if not pixmap.isNull():
+            self.original_pixmap = pixmap
+            self.update_image()
 
     def update_image(self):
         if self.original_pixmap and not self.original_pixmap.isNull():
@@ -169,7 +201,12 @@ class ComputerVisionApp(QMainWindow):
         self.setWindowTitle("CV Toolkit Pro")
         self.resize(1300, 850)
 
-        # State
+        # State mapping
+        self.current_image_np = None
+        self.hybrid_img_a_np = None
+        self.hybrid_img_b_np = None
+        self.undo_stack_np = []
+        
         self.is_dark_mode = True
 
         # UI Initialization
@@ -228,6 +265,7 @@ class ComputerVisionApp(QMainWindow):
         btn_load.clicked.connect(lambda: self.handle_image_upload(self.lbl_orig))
         btn_undo = QPushButton("↩ Undo Last Action")
         btn_undo.setObjectName("SecondaryBtn")
+        btn_undo.clicked.connect(self.undo_action)
         l.addWidget(btn_load)
         l.addWidget(btn_undo)
         file_group.setLayout(l)
@@ -241,6 +279,7 @@ class ComputerVisionApp(QMainWindow):
         self.slider_noise = QSlider(Qt.Orientation.Horizontal)
         self.slider_noise.setRange(0, 100)
         btn_noise = QPushButton("Apply Noise")
+        btn_noise.clicked.connect(self.apply_noise)
         l.addWidget(QLabel("Type:"))
         l.addWidget(self.combo_noise)
         l.addWidget(QLabel("Intensity:"))
@@ -259,6 +298,7 @@ class ComputerVisionApp(QMainWindow):
         self.spin_kernel.setSingleStep(2)
         self.spin_kernel.setValue(3)
         btn_filter = QPushButton("Apply Filter")
+        btn_filter.clicked.connect(self.apply_filter)
         l.addWidget(QLabel("Filter Type:"))
         l.addWidget(self.combo_filter)
         l.addWidget(QLabel("Kernel Size (Odd):"))
@@ -273,6 +313,7 @@ class ComputerVisionApp(QMainWindow):
         self.combo_edge = QComboBox()
         self.combo_edge.addItems(["Sobel", "Roberts", "Prewitt", "Canny"])
         btn_edge = QPushButton("Detect Edges")
+        btn_edge.clicked.connect(self.apply_edge)
         l.addWidget(QLabel("Method:"))
         l.addWidget(self.combo_edge)
         l.addWidget(btn_edge)
@@ -285,6 +326,7 @@ class ComputerVisionApp(QMainWindow):
         self.combo_freq = QComboBox()
         self.combo_freq.addItems(["Low Pass (Blur)", "High Pass (Sharpen)"])
         btn_freq = QPushButton("Apply FFT Filter")
+        btn_freq.clicked.connect(self.apply_freq)
         l.addWidget(self.combo_freq)
         l.addWidget(btn_freq)
         freq_group.setLayout(l)
@@ -293,8 +335,15 @@ class ComputerVisionApp(QMainWindow):
         # 6. Global Ops
         ops_group = self.create_group_box("Enhancement")
         l = QVBoxLayout()
-        l.addWidget(QPushButton("Equalize Histogram"))
-        l.addWidget(QPushButton("Normalize Image"))
+        self.btn_grayscale = QPushButton("Convert to Grayscale")
+        self.btn_grayscale.clicked.connect(self.apply_grayscale)
+        self.btn_equalize = QPushButton("Equalize Histogram")
+        self.btn_equalize.clicked.connect(self.apply_equalize)
+        self.btn_normalize = QPushButton("Normalize Image")
+        self.btn_normalize.clicked.connect(self.apply_normalize)
+        l.addWidget(self.btn_grayscale)
+        l.addWidget(self.btn_equalize)
+        l.addWidget(self.btn_normalize)
         ops_group.setLayout(l)
         controls_layout.addWidget(ops_group)
 
@@ -351,7 +400,10 @@ class ComputerVisionApp(QMainWindow):
         btn_load_a.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
         l_a.addWidget(btn_load_a)
         l_a.addWidget(QLabel("Cutoff Frequency:"))
-        l_a.addWidget(QSlider(Qt.Orientation.Horizontal))
+        self.slider_cutoff_a = QSlider(Qt.Orientation.Horizontal)
+        self.slider_cutoff_a.setRange(10, 100)
+        self.slider_cutoff_a.setValue(30)
+        l_a.addWidget(self.slider_cutoff_a)
         grp_a.setLayout(l_a)
 
         grp_b = self.create_group_box("Image B (High Pass)")
@@ -360,11 +412,15 @@ class ComputerVisionApp(QMainWindow):
         btn_load_b.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
         l_b.addWidget(btn_load_b)
         l_b.addWidget(QLabel("Cutoff Frequency:"))
-        l_b.addWidget(QSlider(Qt.Orientation.Horizontal))
+        self.slider_cutoff_b = QSlider(Qt.Orientation.Horizontal)
+        self.slider_cutoff_b.setRange(10, 100)
+        self.slider_cutoff_b.setValue(30)
+        l_b.addWidget(self.slider_cutoff_b)
         grp_b.setLayout(l_b)
 
         btn_mix = QPushButton("✨ Make Hybrid")
         btn_mix.setMinimumHeight(50)
+        btn_mix.clicked.connect(self.apply_hybrid)
 
         c_layout.addWidget(grp_a)
         c_layout.addWidget(grp_b)
@@ -460,6 +516,166 @@ class ComputerVisionApp(QMainWindow):
         """Sets the image on the label and removes the loading cursor."""
         target_label.set_image(file_path)
         QApplication.restoreOverrideCursor()
+        
+        # Load backing numpy array using OpenCV
+        img_np = cv2.imread(file_path)
+        if img_np is None:
+            return
+            
+        if target_label == self.lbl_orig:
+            self.current_image_np = img_np
+            # Clear undo stack on new image load
+            self.undo_stack_np.clear()
+            self.update_histograms()
+            self.lbl_proc.clear()
+            self.lbl_proc.setText("Processed\nResult")
+        elif target_label == self.lbl_hybrid_a:
+            self.hybrid_img_a_np = img_np
+        elif target_label == self.lbl_hybrid_b:
+            self.hybrid_img_b_np = img_np
+
+    def set_processed_image(self, result_np):
+        """Helper to save history and display result on the screen."""
+        if self.current_image_np is not None:
+            self.undo_stack_np.append(self.current_image_np.copy())
+            
+        self.current_image_np = result_np
+        
+        # Update display
+        qpixmap = numpy_to_qpixmap(result_np)
+        self.lbl_proc.set_pixmap_data(qpixmap)
+        
+        self.update_histograms()
+        
+    def undo_action(self):
+        if self.undo_stack_np:
+            self.current_image_np = self.undo_stack_np.pop()
+            
+            # Show on processed label (even if it's the original, just for visual feedback)
+            qpixmap = numpy_to_qpixmap(self.current_image_np)
+            self.lbl_proc.set_pixmap_data(qpixmap)
+            self.update_histograms()
+
+    def update_histograms(self):
+        if self.current_image_np is None:
+            return
+            
+        # Draw on canvas
+        self.figure.clear()
+        
+        # We'll calculate Hist & CDF via our Pybind backend
+        hist_data = backend.calculate_histogram(self.current_image_np)
+        cdf_data = backend.calculate_cdf(self.current_image_np)
+        
+        ax = self.figure.add_subplot(111)
+        colors = ('r', 'g', 'b') if hist_data.shape[0] == 3 else ('gray',)
+        
+        ax.set_title("Histogram & CDF")
+        ax.set_xlabel("Pixel Intensity")
+        ax.set_ylabel("Frequency")
+        
+        # Plot Hist
+        for i, color in enumerate(colors):
+            ax.plot(hist_data[i], color=color, alpha=0.7)
+            
+        # Plot CDF on secondary Y axis
+        ax2 = ax.twinx()
+        ax2.set_ylabel("CDF")
+        for i, color in enumerate(colors):
+            # Normalize CDF for plotting
+            normalized_cdf = cdf_data[i] / cdf_data[i][-1] if cdf_data[i][-1] > 0 else cdf_data[i]
+            ax2.plot(normalized_cdf, color=color, linestyle='--')
+            
+        # Refresh colors based on theme
+        bg_color = '#1e1e1e' if self.is_dark_mode else '#f0f2f5'
+        fg_color = 'white' if self.is_dark_mode else 'black'
+        ax.set_facecolor('#252526' if self.is_dark_mode else 'white')
+        ax.tick_params(colors=fg_color)
+        ax2.tick_params(colors=fg_color)
+        ax.xaxis.label.set_color(fg_color)
+        ax.yaxis.label.set_color(fg_color)
+        ax2.yaxis.label.set_color(fg_color)
+        ax.title.set_color(fg_color)
+        self.figure.patch.set_facecolor(bg_color)
+        
+        self.canvas.draw()
+
+    def apply_noise(self):
+        if self.current_image_np is None:
+            return
+            
+        noise_type = self.combo_noise.currentText()
+        intensity = self.slider_noise.value()
+        res = backend.add_noise(self.current_image_np, noise_type, intensity)
+        self.set_processed_image(res)
+
+    def apply_filter(self):
+        if self.current_image_np is None:
+            return
+            
+        filter_type = self.combo_filter.currentText()
+        kernel_size = self.spin_kernel.value()
+        if kernel_size % 2 == 0:
+            kernel_size += 1 # Ensure odd
+            
+        res = backend.apply_filter(self.current_image_np, filter_type, kernel_size)
+        self.set_processed_image(res)
+
+    def apply_edge(self):
+        if self.current_image_np is None:
+            return
+            
+        method = self.combo_edge.currentText()
+        if method == "Sobel":
+            res = backend.sobel(self.current_image_np)
+        elif method == "Roberts":
+            res = backend.roberts(self.current_image_np)
+        elif method == "Prewitt":
+            res = backend.prewitt(self.current_image_np)
+        else:
+            # Pass default Canny thresholds 100 and 200
+            res = backend.canny(self.current_image_np, 100.0, 200.0)
+            
+        self.set_processed_image(res)
+
+    def apply_freq(self):
+        if self.current_image_np is None:
+            return
+            
+        filter_type = "low_pass" if "Low" in self.combo_freq.currentText() else "high_pass"
+        # Since we don't have a radius slider for single image freq filter in the UI yet, we can use a fixed default
+        radius = 30
+        res = backend.apply_fft(self.current_image_np, filter_type, radius)
+        self.set_processed_image(res)
+
+    def apply_grayscale(self):
+        if self.current_image_np is None:
+            return
+        res = backend.to_grayscale(self.current_image_np)
+        self.set_processed_image(res)
+
+    def apply_equalize(self):
+        if self.current_image_np is None:
+            return
+        res = backend.equalize(self.current_image_np)
+        self.set_processed_image(res)
+
+    def apply_normalize(self):
+        if self.current_image_np is None:
+            return
+        res = backend.normalize(self.current_image_np)
+        self.set_processed_image(res)
+
+    def apply_hybrid(self):
+        if self.hybrid_img_a_np is None or self.hybrid_img_b_np is None:
+            return
+            
+        radius_a = self.slider_cutoff_a.value()
+        radius_b = self.slider_cutoff_b.value()
+        
+        res = backend.create_hybrid(self.hybrid_img_a_np, self.hybrid_img_b_np, radius_a, radius_b)
+        qpixmap = numpy_to_qpixmap(res)
+        self.lbl_hybrid_res.set_pixmap_data(qpixmap)
 
 
 if __name__ == "__main__":
