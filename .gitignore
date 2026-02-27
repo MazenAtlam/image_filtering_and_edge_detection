@@ -56,9 +56,6 @@ pip-delete-this-directory.txt
 # Ignore large media files, datasets, or models used for processing
 datasets/
 models/
-*.jpg
-*.jpeg
-*.png
 *.mp4
 *.avi
 *.weights
