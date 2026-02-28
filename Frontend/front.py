@@ -2,9 +2,9 @@ import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QComboBox,
                              QSlider, QSpinBox, QTabWidget, QGroupBox, QFileDialog,
-                             QScrollArea, QSplitter, QFrame, QSizePolicy)
-from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette, QPixmap, QImage
+                             QScrollArea, QSplitter, QFrame, QSizePolicy, QMessageBox)
+from PyQt6.QtCore import Qt, QSize, QTimer, QEvent, pyqtSignal
+from PyQt6.QtGui import QAction, QIcon, QFont, QColor, QPalette, QPixmap, QImage, QShortcut, QKeySequence
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
@@ -42,6 +42,8 @@ def numpy_to_qpixmap(img_array):
 
 class ImageLabel(QLabel):
     """A custom QLabel that automatically scales its pixmap to fit its size while preserving aspect ratio."""
+
+    double_clicked = pyqtSignal()
 
     def __init__(self, text=""):
         super().__init__(text)
@@ -82,6 +84,11 @@ class ImageLabel(QLabel):
         if self.original_pixmap:
             self.update_image()
         super().resizeEvent(event)
+        
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.double_clicked.emit()
+        super().mouseDoubleClickEvent(event)
 
 
 # ==========================================
@@ -138,55 +145,22 @@ class AppStyle:
             color: #555;
             font-size: 16px;
         }
-    """
 
-    # --- LIGHT THEME PALETTE ---
-    LIGHT_STYLE = """
-        QMainWindow { background-color: #f0f2f5; }
-        QWidget { color: #333; font-family: 'Segoe UI', sans-serif; font-size: 14px; }
-
-        /* Tabs */
-        QTabWidget::pane { border: 1px solid #ccc; background: #fff; border-radius: 5px; }
-        QTabBar::tab { background: #e0e0e0; color: #555; padding: 10px 20px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
-        QTabBar::tab:selected { background: #fff; color: #000; border-bottom: 2px solid #007acc; }
-
-        /* Groups / Cards */
-        QGroupBox { 
-            border: 1px solid #ddd; 
-            border-radius: 8px; 
-            margin-top: 20px; 
-            background-color: #ffffff; 
-            font-weight: bold;
+        /* Plot Tab Buttons */
+        QPushButton#PlotTabBtn { 
+            background-color: #2d2d2d; 
+            color: #aaa; 
+            border: 1px solid #3e3e42;
+            border-bottom: none;
+            border-top-left-radius: 4px; 
+            border-top-right-radius: 4px; 
+            padding: 5px 15px; 
         }
-        QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #007acc; }
-
-        /* Controls */
-        QPushButton { 
+        QPushButton#PlotTabBtn:hover { background-color: #3e3e42; }
+        QPushButton#PlotTabBtn:checked { 
             background-color: #007acc; 
             color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 8px 16px; 
-            font-weight: bold;
-        }
-        QPushButton:hover { background-color: #0062a3; }
-        QPushButton#SecondaryBtn { background-color: #e0e0e0; color: #333; }
-        QPushButton#SecondaryBtn:hover { background-color: #d0d0d0; }
-
-        QComboBox, QSpinBox { 
-            background-color: #fff; 
-            border: 1px solid #ccc; 
-            border-radius: 4px; 
-            padding: 5px; 
-            color: #333; 
-        }
-
-        /* Image Display Area */
-        QLabel#ImageDisplay { 
-            border: 2px dashed #ccc; 
-            background-color: #fafafa; 
-            color: #aaa;
-            font-size: 16px;
+            border-color: #007acc;
         }
     """
 
@@ -199,40 +173,58 @@ class ComputerVisionApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CV Toolkit Pro")
-        self.resize(1300, 850)
+        self.showMaximized()
 
         # State mapping
         self.current_image_np = None
         self.hybrid_img_a_np = None
         self.hybrid_img_b_np = None
         self.undo_stack_np = []
+        self.redo_stack_np = []
         
-        self.is_dark_mode = True
+        self.current_plot_mode = 'hist'
 
         # UI Initialization
         self.init_ui()
         self.apply_theme()
+        
+        # Install event filter to prevent scroll wheel changing input values
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Wheel:
+            # Ignore wheel events on these types unless they explicitly have focus
+            if isinstance(obj, (QComboBox, QSpinBox, QSlider)) and not obj.hasFocus():
+                event.ignore()
+                return True
+        return super().eventFilter(obj, event)
 
     def init_ui(self):
-        # Top Toolbar for Theme Toggle
-        toolbar = QWidget()
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(10, 5, 10, 5)
-
-        self.theme_btn = QPushButton("Switch to Light Mode")
-        self.theme_btn.setObjectName("SecondaryBtn")
-        self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.theme_btn.clicked.connect(self.toggle_theme)
-
-        toolbar_layout.addStretch()
-        toolbar_layout.addWidget(self.theme_btn)
-        toolbar.setLayout(toolbar_layout)
+        # Keyboard Shortcuts
+        QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self.undo_action)
+        QShortcut(QKeySequence("Ctrl+Shift+Z"), self).activated.connect(self.redo_action)
+        QShortcut(QKeySequence("Ctrl+Y"), self).activated.connect(self.redo_action)
 
         # Main Layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
-        main_layout.addWidget(toolbar)
+
+        # Top Bar for Global Buttons (like Download Result)
+        top_bar = QWidget()
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(10, 5, 10, 5)
+        
+        self.btn_download_main = QPushButton("💾 Download Result Image")
+        self.btn_download_main.setObjectName("SecondaryBtn")
+        self.btn_download_main.setMinimumHeight(35)
+        self.btn_download_main.clicked.connect(lambda: self.download_image(self.current_image_np, "Result"))
+        self.btn_download_main.setVisible(False)  # Hidden until we have an image
+        
+        top_bar_layout.addStretch()
+        top_bar_layout.addWidget(self.btn_download_main)
+        
+        main_layout.addWidget(top_bar)
 
         # Tabs
         self.tabs = QTabWidget()
@@ -240,6 +232,9 @@ class ComputerVisionApp(QMainWindow):
 
         self.init_main_tab()
         self.init_hybrid_tab()
+        
+        # Hide the global download button/topbar if not on the Image Processor tab
+        self.tabs.currentChanged.connect(lambda index: top_bar.setVisible(index == 0))
 
     def init_main_tab(self):
         tab = QWidget()
@@ -263,11 +258,21 @@ class ComputerVisionApp(QMainWindow):
         btn_load = QPushButton("📂 Load Image")
         # Connect to handle_image_upload passing the target label
         btn_load.clicked.connect(lambda: self.handle_image_upload(self.lbl_orig))
+        
+        hist_layout = QHBoxLayout()
         btn_undo = QPushButton("↩ Undo Last Action")
         btn_undo.setObjectName("SecondaryBtn")
         btn_undo.clicked.connect(self.undo_action)
+        
+        btn_redo = QPushButton("↪ Redo Last Action")
+        btn_redo.setObjectName("SecondaryBtn")
+        btn_redo.clicked.connect(self.redo_action)
+
+        hist_layout.addWidget(btn_undo)
+        hist_layout.addWidget(btn_redo)
+        
         l.addWidget(btn_load)
-        l.addWidget(btn_undo)
+        l.addLayout(hist_layout)
         file_group.setLayout(l)
         controls_layout.addWidget(file_group)
 
@@ -427,22 +432,50 @@ class ComputerVisionApp(QMainWindow):
         img_layout = QHBoxLayout(img_container)
 
         # Use Custom ImageLabel
-        self.lbl_orig = ImageLabel("Original\n(Drop Image Here)")
+        self.lbl_orig = ImageLabel("Original\n(Drop or Double-Click Here)")
         self.lbl_orig.setObjectName("ImageDisplay")
+        self.lbl_orig.double_clicked.connect(lambda: self.handle_image_upload(self.lbl_orig))
 
         self.lbl_proc = ImageLabel("Processed\nResult")
         self.lbl_proc.setObjectName("ImageDisplay")
+        
+        img_layout.addWidget(self.lbl_orig, stretch=1)
+        img_layout.addWidget(self.lbl_proc, stretch=1)
 
-        img_layout.addWidget(self.lbl_orig)
-        img_layout.addWidget(self.lbl_proc)
+        # Histogram Area container
+        hist_area_widget = QWidget()
+        hist_area_layout = QVBoxLayout(hist_area_widget)
+        hist_area_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Histogram Canvas
+        # Toggle buttons for Hist/CDF
+        plot_tabs_layout = QHBoxLayout()
+        plot_tabs_layout.setSpacing(0)
+        
+        self.btn_show_hist = QPushButton("Histogram")
+        self.btn_show_hist.setObjectName("PlotTabBtn")
+        self.btn_show_hist.setCheckable(True)
+        self.btn_show_hist.setChecked(True)
+        self.btn_show_hist.clicked.connect(lambda: self.set_plot_mode('hist'))
+        
+        self.btn_show_cdf = QPushButton("CDF")
+        self.btn_show_cdf.setObjectName("PlotTabBtn")
+        self.btn_show_cdf.setCheckable(True)
+        self.btn_show_cdf.clicked.connect(lambda: self.set_plot_mode('cdf'))
+        
+        plot_tabs_layout.addWidget(self.btn_show_hist)
+        plot_tabs_layout.addWidget(self.btn_show_cdf)
+        plot_tabs_layout.addStretch()
+
+        # Canvas
         self.figure = Figure(figsize=(5, 3), dpi=100)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setMinimumHeight(250)
 
+        hist_area_layout.addLayout(plot_tabs_layout)
+        hist_area_layout.addWidget(self.canvas)
+
         display_layout.addWidget(img_container, stretch=2)
-        display_layout.addWidget(self.canvas, stretch=1)
+        display_layout.addWidget(hist_area_widget, stretch=1)
 
         # Add to Splitter
         splitter.addWidget(scroll_area)
@@ -519,24 +552,61 @@ class ComputerVisionApp(QMainWindow):
 
         # Top: Inputs using Custom ImageLabel
         top_row = QHBoxLayout()
-        self.lbl_hybrid_a = ImageLabel("Img A")
+        
+        container_a = QWidget()
+        layout_a = QVBoxLayout(container_a)
+        layout_a.setContentsMargins(0, 0, 0, 0)
+        self.lbl_hybrid_a = ImageLabel("Img A (Low Pass)\n(Double-Click to Load)")
         self.lbl_hybrid_a.setObjectName("ImageDisplay")
+        self.lbl_hybrid_a.double_clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
+        
+        # We need a dedicated np array state for the intermediate filtered images to download
+        self.hybrid_img_a_filtered_np = None
+        self.hybrid_img_b_filtered_np = None
+        
+        btn_download_a = QPushButton("💾 Download A")
+        btn_download_a.setObjectName("SecondaryBtn")
+        btn_download_a.clicked.connect(lambda: self.download_image(self.hybrid_img_a_filtered_np if self.hybrid_img_a_filtered_np is not None else self.hybrid_img_a_np, "Image A"))
+        layout_a.addWidget(self.lbl_hybrid_a)
+        layout_a.addWidget(btn_download_a)
 
-        self.lbl_hybrid_b = ImageLabel("Img B")
+        container_b = QWidget()
+        layout_b = QVBoxLayout(container_b)
+        layout_b.setContentsMargins(0, 0, 0, 0)
+        self.lbl_hybrid_b = ImageLabel("Img B (High Pass)\n(Double-Click to Load)")
         self.lbl_hybrid_b.setObjectName("ImageDisplay")
+        self.lbl_hybrid_b.double_clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
+        
+        btn_download_b = QPushButton("💾 Download B")
+        btn_download_b.setObjectName("SecondaryBtn")
+        btn_download_b.clicked.connect(lambda: self.download_image(self.hybrid_img_b_filtered_np if self.hybrid_img_b_filtered_np is not None else self.hybrid_img_b_np, "Image B"))
+        layout_b.addWidget(self.lbl_hybrid_b)
+        layout_b.addWidget(btn_download_b)
 
-        top_row.addWidget(self.lbl_hybrid_a)
-        top_row.addWidget(self.lbl_hybrid_b)
+        top_row.addWidget(container_a)
+        top_row.addWidget(container_b)
 
         # Bottom: Result using Custom ImageLabel
+        container_res = QWidget()
+        layout_res = QVBoxLayout(container_res)
+        layout_res.setContentsMargins(0, 0, 0, 0)
+        
         self.lbl_hybrid_res = ImageLabel("Hybrid Result")
         self.lbl_hybrid_res.setObjectName("ImageDisplay")
         self.lbl_hybrid_res.setStyleSheet("border: 2px solid #007acc;")
+        
+        # State for the final result
+        self.hybrid_res_np = None
+        btn_download_res = QPushButton("💾 Download Hybrid")
+        btn_download_res.setObjectName("SecondaryBtn")
+        btn_download_res.clicked.connect(lambda: self.download_image(self.hybrid_res_np, "Hybrid Result"))
+        layout_res.addWidget(self.lbl_hybrid_res)
+        layout_res.addWidget(btn_download_res)
 
         # --- THE FIX: Equal Stretch Factors ---
         # By giving both a stretch of 1, they perfectly split the vertical space 50/50
         d_layout.addLayout(top_row, stretch=1)
-        d_layout.addWidget(self.lbl_hybrid_res, stretch=1)
+        d_layout.addWidget(container_res, stretch=1)
 
         layout.addWidget(controls)
         layout.addWidget(display)
@@ -579,31 +649,15 @@ class ComputerVisionApp(QMainWindow):
         group = QGroupBox(title)
         return group
 
-    def toggle_theme(self):
-        self.is_dark_mode = not self.is_dark_mode
-        self.apply_theme()
-
     def apply_theme(self):
-        if self.is_dark_mode:
-            self.setStyleSheet(AppStyle.DARK_STYLE)
-            self.theme_btn.setText("☀️ Light Mode")
-            # Update Matplotlib colors for Dark Mode
-            self.figure.patch.set_facecolor('#1e1e1e')
-            self.figure.gca().set_facecolor('#252526')
-            self.figure.gca().tick_params(colors='white')
-            self.figure.gca().xaxis.label.set_color('white')
-            self.figure.gca().yaxis.label.set_color('white')
-            self.figure.gca().title.set_color('white')
-        else:
-            self.setStyleSheet(AppStyle.LIGHT_STYLE)
-            self.theme_btn.setText("🌙 Dark Mode")
-            # Update Matplotlib colors for Light Mode
-            self.figure.patch.set_facecolor('#f0f2f5')
-            self.figure.gca().set_facecolor('white')
-            self.figure.gca().tick_params(colors='black')
-            self.figure.gca().xaxis.label.set_color('black')
-            self.figure.gca().yaxis.label.set_color('black')
-            self.figure.gca().title.set_color('black')
+        self.setStyleSheet(AppStyle.DARK_STYLE)
+        # Update Matplotlib colors for Dark Mode
+        self.figure.patch.set_facecolor('#1e1e1e')
+        self.figure.gca().set_facecolor('#252526')
+        self.figure.gca().tick_params(colors='white')
+        self.figure.gca().xaxis.label.set_color('white')
+        self.figure.gca().yaxis.label.set_color('white')
+        self.figure.gca().title.set_color('white')
 
         self.canvas.draw()
 
@@ -640,18 +694,31 @@ class ComputerVisionApp(QMainWindow):
             self.current_image_np = img_np
             # Clear undo stack on new image load
             self.undo_stack_np.clear()
+            self.redo_stack_np.clear()
             self.update_histograms()
             self.lbl_proc.clear()
             self.lbl_proc.setText("Processed\nResult")
+            self.btn_download_main.setVisible(True)
         elif target_label == self.lbl_hybrid_a:
             self.hybrid_img_a_np = img_np
+            # Show immediate feedback
+            radius_a = self.slider_cutoff_a.value()
+            self.hybrid_img_a_filtered_np = backend.apply_fft(self.hybrid_img_a_np, "low_pass", radius_a)
+            qpixmap_a = numpy_to_qpixmap(self.hybrid_img_a_filtered_np)
+            self.lbl_hybrid_a.set_pixmap_data(qpixmap_a)
         elif target_label == self.lbl_hybrid_b:
             self.hybrid_img_b_np = img_np
+            # Show immediate feedback
+            radius_b = self.slider_cutoff_b.value()
+            self.hybrid_img_b_filtered_np = backend.apply_fft(self.hybrid_img_b_np, "high_pass", radius_b)
+            qpixmap_b = numpy_to_qpixmap(self.hybrid_img_b_filtered_np)
+            self.lbl_hybrid_b.set_pixmap_data(qpixmap_b)
 
     def set_processed_image(self, result_np):
         """Helper to save history and display result on the screen."""
         if self.current_image_np is not None:
             self.undo_stack_np.append(self.current_image_np.copy())
+            self.redo_stack_np.clear()
             
         self.current_image_np = result_np
         
@@ -663,12 +730,34 @@ class ComputerVisionApp(QMainWindow):
         
     def undo_action(self):
         if self.undo_stack_np:
+            if self.current_image_np is not None:
+                self.redo_stack_np.append(self.current_image_np.copy())
             self.current_image_np = self.undo_stack_np.pop()
             
             # Show on processed label (even if it's the original, just for visual feedback)
             qpixmap = numpy_to_qpixmap(self.current_image_np)
             self.lbl_proc.set_pixmap_data(qpixmap)
             self.update_histograms()
+
+    def redo_action(self):
+        if self.redo_stack_np:
+            if self.current_image_np is not None:
+                self.undo_stack_np.append(self.current_image_np.copy())
+            self.current_image_np = self.redo_stack_np.pop()
+
+            qpixmap = numpy_to_qpixmap(self.current_image_np)
+            self.lbl_proc.set_pixmap_data(qpixmap)
+            self.update_histograms()
+
+    def set_plot_mode(self, mode):
+        self.current_plot_mode = mode
+        if mode == 'hist':
+            self.btn_show_hist.setChecked(True)
+            self.btn_show_cdf.setChecked(False)
+        else:
+            self.btn_show_hist.setChecked(False)
+            self.btn_show_cdf.setChecked(True)
+        self.update_histograms()
 
     def update_histograms(self):
         if self.current_image_np is None:
@@ -677,40 +766,35 @@ class ComputerVisionApp(QMainWindow):
         # Draw on canvas
         self.figure.clear()
         
-        # We'll calculate Hist & CDF via our Pybind backend
-        hist_data = backend.calculate_histogram(self.current_image_np)
-        cdf_data = backend.calculate_cdf(self.current_image_np)
-        
         ax = self.figure.add_subplot(111)
-        colors = ('r', 'g', 'b') if hist_data.shape[0] == 3 else ('gray',)
         
-        ax.set_title("Histogram & CDF")
+        is_color = len(self.current_image_np.shape) == 3
+        colors = ('r', 'g', 'b') if is_color else ('gray',)
+        
+        if self.current_plot_mode == 'hist':
+            hist_data = backend.calculate_histogram(self.current_image_np)
+            ax.set_title("Histogram")
+            ax.set_ylabel("Frequency")
+            for i, color in enumerate(colors):
+                ax.plot(hist_data[i] if is_color else hist_data[0], color=color, alpha=0.7)
+        else:
+            cdf_data = backend.calculate_cdf(self.current_image_np)
+            ax.set_title("Cumulative Distribution Function (CDF)")
+            ax.set_ylabel("CDF")
+            for i, color in enumerate(colors):
+                data = cdf_data[i] if is_color else cdf_data[0]
+                normalized_cdf = data / data[-1] if data[-1] > 0 else data
+                ax.plot(normalized_cdf, color=color, linestyle='--')
+        
         ax.set_xlabel("Pixel Intensity")
-        ax.set_ylabel("Frequency")
-        
-        # Plot Hist
-        for i, color in enumerate(colors):
-            ax.plot(hist_data[i], color=color, alpha=0.7)
-            
-        # Plot CDF on secondary Y axis
-        ax2 = ax.twinx()
-        ax2.set_ylabel("CDF")
-        for i, color in enumerate(colors):
-            # Normalize CDF for plotting
-            normalized_cdf = cdf_data[i] / cdf_data[i][-1] if cdf_data[i][-1] > 0 else cdf_data[i]
-            ax2.plot(normalized_cdf, color=color, linestyle='--')
             
         # Refresh colors based on theme
-        bg_color = '#1e1e1e' if self.is_dark_mode else '#f0f2f5'
-        fg_color = 'white' if self.is_dark_mode else 'black'
-        ax.set_facecolor('#252526' if self.is_dark_mode else 'white')
-        ax.tick_params(colors=fg_color)
-        ax2.tick_params(colors=fg_color)
-        ax.xaxis.label.set_color(fg_color)
-        ax.yaxis.label.set_color(fg_color)
-        ax2.yaxis.label.set_color(fg_color)
-        ax.title.set_color(fg_color)
-        self.figure.patch.set_facecolor(bg_color)
+        ax.set_facecolor('#252526')
+        ax.tick_params(colors='white')
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.title.set_color('white')
+        self.figure.patch.set_facecolor('#1e1e1e')
         
         self.canvas.draw()
 
@@ -786,8 +870,19 @@ class ComputerVisionApp(QMainWindow):
         radius_b = self.slider_cutoff_b.value()
         
         res = backend.create_hybrid(self.hybrid_img_a_np, self.hybrid_img_b_np, radius_a, radius_b)
+        self.hybrid_res_np = res
         qpixmap = numpy_to_qpixmap(res)
         self.lbl_hybrid_res.set_pixmap_data(qpixmap)
+
+    def download_image(self, img_np, image_name):
+        """Helper to prompt for save location and save the current image."""
+        if img_np is None:
+            QMessageBox.warning(self, "No Image", f"Cannot download {image_name}. Please make sure an image is loaded and processed first.")
+            return
+            
+        file_path, _ = QFileDialog.getSaveFileName(self, f"Save {image_name}", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        if file_path:
+            cv2.imwrite(file_path, img_np)
 
 
 if __name__ == "__main__":
