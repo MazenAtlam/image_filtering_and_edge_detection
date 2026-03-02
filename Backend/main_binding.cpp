@@ -1,6 +1,4 @@
-#include <pybind11/pybind11.h>
-
-#define FREQ_DONT_BIND
+#include "binding_utils.h"
 #include "get_intensity_data.cpp"
 #include "adding_noise.cpp"
 #include "filter_noise.cpp"
