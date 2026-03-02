@@ -3,6 +3,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "binding_utils.h"
+#include "intensity_data_info.h"
 #include <string>
 
 namespace py = pybind11;
@@ -33,12 +34,7 @@ private:
 public:
     // Apply the Frequency domain Filters
     static cv::Mat applyFFTFilter(const cv::Mat& image, const std::string& filter_type, int radius) {
-        cv::Mat gray;
-        if (image.channels() == 3) {
-            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         // Expand input image to optimal size for fast computation
         cv::Mat padded;

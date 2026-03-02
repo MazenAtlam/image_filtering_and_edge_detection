@@ -2,20 +2,17 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include "binding_utils.h"
+#include "intensity_data_info.h"
 
 class ImageEnhancer {
 public:
     // 1. Histogram Equalization (for Grayscale Images)
     static cv::Mat equalizeHistogram(const cv::Mat& image) {
-        cv::Mat gray;
         // Convert to grayscale if it's a color image. 
         // Note: For color histogram equalization typically you'd convert to YUV/HSV and equalize the Lightness/Value channel.
         // For simplicity and standard assignment requirements, we apply it on the grayscale version.
-        if (image.channels() == 3) {
-            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         // 1. Calculate Histogram
         int hist[256] = {0};
@@ -69,12 +66,7 @@ public:
 
     // 2. Image Normalization (Contrast Stretching)
     static cv::Mat normalizeImage(const cv::Mat& image) {
-        cv::Mat gray;
-        if (image.channels() == 3) {
-             cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-             gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         // 1. Find the min (I_min) and max (I_max) intensity values in the current image
         uchar I_min = 255;
@@ -114,7 +106,6 @@ public:
 };
 
 // Pybind11 Wrappers
-#include "binding_utils.h"
 
 py::array_t<unsigned char> equalize_wrapper(py::array_t<unsigned char> img) {
     auto mat = numpy_to_mat(img);
