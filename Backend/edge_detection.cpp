@@ -15,27 +15,42 @@
         return result;
     }
 
-    // Helper for 3x3 convolution
-    static cv::Mat apply3x3EdgeFilter(const cv::Mat& image, const int kx[3][3], const int ky[3][3]) {
+    // General Helper for edge filter convolutions using cv::Mat kernels (Assumes odd symmetric kernels)
+    static cv::Mat applyEdgeFilter(const cv::Mat& image, const cv::Mat& Kx, const cv::Mat& Ky, double scale = 1.0) {
         cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         cv::Mat result = cv::Mat::zeros(gray.size(), CV_8UC1);
         cv::Mat padded;
-        // Pad with 1 pixel on all sides
-        cv::copyMakeBorder(gray, padded, 1, 1, 1, 1, cv::BORDER_REPLICATE);
+
+        // Assumes Kx and Ky are odd and square
+        int ksize = Kx.rows;
+        int pad = ksize / 2;
+
+        std::vector<std::vector<int>> kx_vec(ksize, std::vector<int>(ksize));
+        std::vector<std::vector<int>> ky_vec(ksize, std::vector<int>(ksize));
+        for (int i = 0; i < ksize; ++i) {
+            for (int j = 0; j < ksize; ++j) {
+                kx_vec[i][j] = Kx.at<int>(i, j);
+                ky_vec[i][j] = Ky.at<int>(i, j);
+            }
+        }
+
+        cv::copyMakeBorder(gray, padded, pad, pad, pad, pad, cv::BORDER_REPLICATE);
 
         for (int y = 0; y < gray.rows; ++y) {
             uchar* res_ptr = result.ptr<uchar>(y);
             for (int x = 0; x < gray.cols; ++x) {
                 double px = 0.0, py = 0.0;
-                for (int i = 0; i < 3; ++i) {
+                for (int i = 0; i < ksize; ++i) {
                     const uchar* pad_ptr = padded.ptr<uchar>(y + i);
-                    for (int j = 0; j < 3; ++j) {
+                    for (int j = 0; j < ksize; ++j) {
                         int val = pad_ptr[x + j];
-                        px += val * kx[i][j];
-                        py += val * ky[i][j];
+                        px += val * kx_vec[i][j];
+                        py += val * ky_vec[i][j];
                     }
                 }
+                px *= scale;
+                py *= scale;
                 double mag = std::sqrt(px * px + py * py);
                 res_ptr[x] = cv::saturate_cast<uchar>(mag);
             }
@@ -82,54 +97,29 @@
             }
         }
 
-        std::vector<std::vector<int>> Kx(grid_size, std::vector<int>(grid_size, 0));
-        std::vector<std::vector<int>> Ky(grid_size, std::vector<int>(grid_size, 0));
+        cv::Mat Kx_mat(grid_size, grid_size, CV_32S);
+        cv::Mat Ky_mat(grid_size, grid_size, CV_32S);
 
         double sum_pos = 0;
         for (int y = 0; y < grid_size; ++y) {
             for (int x = 0; x < grid_size; ++x) {
-                Kx[y][x] = smooth[y] * deriv[x];
-                Ky[y][x] = deriv[y] * smooth[x];
-                if (Kx[y][x] > 0) sum_pos += Kx[y][x];
+                int vx = smooth[y] * deriv[x];
+                int vy = deriv[y] * smooth[x];
+                Kx_mat.at<int>(y, x) = vx;
+                Ky_mat.at<int>(y, x) = vy;
+                if (vx > 0) sum_pos += vx;
             }
         }
 
         double scale = (sum_pos > 0) ? (4.0 / sum_pos) : 1.0;
-
-        cv::Mat result = cv::Mat::zeros(gray.size(), CV_8UC1);
-        cv::Mat padded;
-        int pad = grid_size / 2;
-        cv::copyMakeBorder(gray, padded, pad, pad, pad, pad, cv::BORDER_REPLICATE);
-
-        for (int y = 0; y < gray.rows; ++y) {
-            uchar* res_ptr = result.ptr<uchar>(y);
-            for (int x = 0; x < gray.cols; ++x) {
-                double px = 0.0, py = 0.0;
-                for (int i = 0; i < grid_size; ++i) {
-                    const uchar* pad_ptr = padded.ptr<uchar>(y + i);
-                    for (int j = 0; j < grid_size; ++j) {
-                        int val = pad_ptr[x + j];
-                        px += val * Kx[i][j];
-                        py += val * Ky[i][j];
-                    }
-                }
-                px *= scale;
-                py *= scale;
-                double mag = std::sqrt(px * px + py * py);
-                res_ptr[x] = cv::saturate_cast<uchar>(mag);
-            }
-        }
-        
-        cv::Mat result_bgr;
-        cv::cvtColor(result, result_bgr, cv::COLOR_GRAY2BGR);
-        return result_bgr;
+        return applyEdgeFilter(image, Kx_mat, Ky_mat, scale);
     }
 
     // Detect Edge using Prewitt masks
     static cv::Mat detectEdgesPrewitt(const cv::Mat& image) {
-        int kx[3][3] = {{-1, 0, 1}, {-1, 0, 1}, {-1, 0, 1}};
-        int ky[3][3] = {{1, 1, 1}, {0, 0, 0}, {-1, -1, -1}};
-        return apply3x3EdgeFilter(image, kx, ky);
+        cv::Mat kx = (cv::Mat_<int>(3, 3) << -1, 0, 1, -1, 0, 1, -1, 0, 1);
+        cv::Mat ky = (cv::Mat_<int>(3, 3) << 1, 1, 1, 0, 0, 0, -1, -1, -1);
+        return applyEdgeFilter(image, kx, ky);
     }
 
     // Detect Edge using Roberts cross masks
