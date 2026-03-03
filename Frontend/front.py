@@ -339,13 +339,26 @@ class ComputerVisionApp(QMainWindow):
         canny_layout.addWidget(self.slider_canny_t2)
         
         self.canny_controls_widget.setVisible(False)
-        self.combo_edge.currentTextChanged.connect(self.toggle_canny_sliders)
+        
+        self.sobel_controls_widget = QWidget()
+        sobel_layout = QVBoxLayout(self.sobel_controls_widget)
+        sobel_layout.setContentsMargins(0, 0, 0, 0)
+        
+        ksize_layout, self.slider_sobel_ksize, self.lbl_sobel_ksize_val = self.create_slider_widget(
+            "Kernel Size:", 0, 3, 1, step=1, value_formatter=lambda v: f"{v * 2 + 1}"
+        )
+        sobel_layout.addLayout(ksize_layout)
+        sobel_layout.addWidget(self.slider_sobel_ksize)
+        self.sobel_controls_widget.setVisible(True)
+
+        self.combo_edge.currentTextChanged.connect(self.toggle_edge_sliders)
 
         btn_edge = QPushButton("Detect Edges")
         btn_edge.clicked.connect(self.apply_edge)
         l.addWidget(QLabel("Method:"))
         l.addWidget(self.combo_edge)
         l.addWidget(self.canny_controls_widget)
+        l.addWidget(self.sobel_controls_widget)
         l.addWidget(btn_edge)
         edge_group.setLayout(l)
         controls_layout.addWidget(edge_group)
@@ -593,11 +606,16 @@ class ComputerVisionApp(QMainWindow):
         res = operation(self.current_image_np, *args, **kwargs)
         self.set_processed_image(res)
 
-    def toggle_canny_sliders(self, text):
+    def toggle_edge_sliders(self, text):
         if text == "Canny":
             self.canny_controls_widget.setVisible(True)
+            self.sobel_controls_widget.setVisible(False)
+        elif text == "Sobel":
+            self.canny_controls_widget.setVisible(False)
+            self.sobel_controls_widget.setVisible(True)
         else:
             self.canny_controls_widget.setVisible(False)
+            self.sobel_controls_widget.setVisible(False)
 
     def create_group_box(self, title):
         group = QGroupBox(title)
@@ -765,7 +783,8 @@ class ComputerVisionApp(QMainWindow):
     def apply_edge(self):
         method = self.combo_edge.currentText()
         if method == "Sobel":
-            self._execute_image_op(backend.sobel)
+            ksize = self.slider_sobel_ksize.value() * 2 + 1
+            self._execute_image_op(backend.sobel, ksize)
         elif method == "Roberts":
             self._execute_image_op(backend.roberts)
         elif method == "Prewitt":
