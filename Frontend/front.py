@@ -282,16 +282,9 @@ class ComputerVisionApp(QMainWindow):
         self.combo_noise = QComboBox()
         self.combo_noise.addItems(["Uniform Noise", "Gaussian Noise", "Salt & Pepper"])
         
-        noise_intensity_layout = QHBoxLayout()
-        noise_intensity_layout.addWidget(QLabel("Intensity:"))
-        self.lbl_noise_intensity_val = QLabel("0")
-        noise_intensity_layout.addWidget(self.lbl_noise_intensity_val)
-        noise_intensity_layout.addStretch()
-
-        self.slider_noise = QSlider(Qt.Orientation.Horizontal)
-        self.slider_noise.setRange(0, 100)
-        self.slider_noise.setValue(0)
-        self.slider_noise.valueChanged.connect(self.update_noise_intensity_label)
+        noise_intensity_layout, self.slider_noise, self.lbl_noise_intensity_val = self.create_slider_widget(
+            "Intensity:", 1, 100, 10
+        )
 
         btn_noise = QPushButton("Apply Noise")
         btn_noise.clicked.connect(self.apply_noise)
@@ -308,17 +301,9 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_filter = QComboBox()
         self.combo_filter.addItems(["Average Filter", "Gaussian Filter", "Median Filter"])
-        kernel_layout = QHBoxLayout()
-        kernel_layout.addWidget(QLabel("Kernel Size:"))
-        self.lbl_kernel_val = QLabel("3")
-        kernel_layout.addWidget(self.lbl_kernel_val)
-        kernel_layout.addStretch()
-
-        self.slider_kernel = QSlider(Qt.Orientation.Horizontal)
-        self.slider_kernel.setRange(0, 14)
-        self.slider_kernel.setSingleStep(1)
-        self.slider_kernel.setValue(0)
-        self.slider_kernel.valueChanged.connect(self.update_kernel_label)
+        kernel_layout, self.slider_kernel, self.lbl_kernel_val = self.create_slider_widget(
+            "Kernel Size:", 0, 14, 0, step=1, value_formatter=lambda v: str(v * 2 + 3)
+        )
 
         btn_filter = QPushButton("Apply Filter")
         btn_filter.clicked.connect(self.apply_filter)
@@ -340,27 +325,13 @@ class ComputerVisionApp(QMainWindow):
         canny_layout = QVBoxLayout(self.canny_controls_widget)
         canny_layout.setContentsMargins(0, 0, 0, 0)
         
-        t1_layout = QHBoxLayout()
-        t1_layout.addWidget(QLabel("Threshold 1:"))
-        self.lbl_canny_t1_val = QLabel("100")
-        t1_layout.addWidget(self.lbl_canny_t1_val)
-        t1_layout.addStretch()
+        t1_layout, self.slider_canny_t1, self.lbl_canny_t1_val = self.create_slider_widget(
+            "Threshold 1:", 0, 500, 100
+        )
         
-        self.slider_canny_t1 = QSlider(Qt.Orientation.Horizontal)
-        self.slider_canny_t1.setRange(0, 500)
-        self.slider_canny_t1.setValue(100)
-        self.slider_canny_t1.valueChanged.connect(self.update_canny_t1_label)
-        
-        t2_layout = QHBoxLayout()
-        t2_layout.addWidget(QLabel("Threshold 2:"))
-        self.lbl_canny_t2_val = QLabel("200")
-        t2_layout.addWidget(self.lbl_canny_t2_val)
-        t2_layout.addStretch()
-        
-        self.slider_canny_t2 = QSlider(Qt.Orientation.Horizontal)
-        self.slider_canny_t2.setRange(0, 500)
-        self.slider_canny_t2.setValue(200)
-        self.slider_canny_t2.valueChanged.connect(self.update_canny_t2_label)
+        t2_layout, self.slider_canny_t2, self.lbl_canny_t2_val = self.create_slider_widget(
+            "Threshold 2:", 0, 500, 200
+        )
         
         canny_layout.addLayout(t1_layout)
         canny_layout.addWidget(self.slider_canny_t1)
@@ -385,16 +356,9 @@ class ComputerVisionApp(QMainWindow):
         self.combo_freq = QComboBox()
         self.combo_freq.addItems(["Low Pass (Blur)", "High Pass (Sharpen)"])
         
-        freq_radius_layout = QHBoxLayout()
-        freq_radius_layout.addWidget(QLabel("Cutoff Radius:"))
-        self.lbl_freq_radius_val = QLabel("30")
-        freq_radius_layout.addWidget(self.lbl_freq_radius_val)
-        freq_radius_layout.addStretch()
-
-        self.slider_freq_radius = QSlider(Qt.Orientation.Horizontal)
-        self.slider_freq_radius.setRange(10, 200)
-        self.slider_freq_radius.setValue(30)
-        self.slider_freq_radius.valueChanged.connect(self.update_freq_radius_label)
+        freq_radius_layout, self.slider_freq_radius, self.lbl_freq_radius_val = self.create_slider_widget(
+            "Cutoff Radius:", 10, 200, 30
+        )
 
         btn_freq = QPushButton("Apply FFT Filter")
         btn_freq.clicked.connect(self.apply_freq)
@@ -501,16 +465,9 @@ class ComputerVisionApp(QMainWindow):
         btn_load_a.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
         l_a.addWidget(btn_load_a)
         
-        cutoff_a_layout = QHBoxLayout()
-        cutoff_a_layout.addWidget(QLabel("Cutoff Radius:"))
-        self.lbl_cutoff_a_val = QLabel("30")
-        cutoff_a_layout.addWidget(self.lbl_cutoff_a_val)
-        cutoff_a_layout.addStretch()
-
-        self.slider_cutoff_a = QSlider(Qt.Orientation.Horizontal)
-        self.slider_cutoff_a.setRange(10, 200)
-        self.slider_cutoff_a.setValue(30)
-        self.slider_cutoff_a.valueChanged.connect(self.update_cutoff_a_label)
+        cutoff_a_layout, self.slider_cutoff_a, self.lbl_cutoff_a_val = self.create_slider_widget(
+            "Cutoff Radius:", 10, 200, 30
+        )
 
         l_a.addLayout(cutoff_a_layout)
         l_a.addWidget(self.slider_cutoff_a)
@@ -522,16 +479,9 @@ class ComputerVisionApp(QMainWindow):
         btn_load_b.clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
         l_b.addWidget(btn_load_b)
         
-        cutoff_b_layout = QHBoxLayout()
-        cutoff_b_layout.addWidget(QLabel("Cutoff Radius:"))
-        self.lbl_cutoff_b_val = QLabel("30")
-        cutoff_b_layout.addWidget(self.lbl_cutoff_b_val)
-        cutoff_b_layout.addStretch()
-
-        self.slider_cutoff_b = QSlider(Qt.Orientation.Horizontal)
-        self.slider_cutoff_b.setRange(10, 200)
-        self.slider_cutoff_b.setValue(30)
-        self.slider_cutoff_b.valueChanged.connect(self.update_cutoff_b_label)
+        cutoff_b_layout, self.slider_cutoff_b, self.lbl_cutoff_b_val = self.create_slider_widget(
+            "Cutoff Radius:", 10, 200, 30
+        )
 
         l_b.addLayout(cutoff_b_layout)
         l_b.addWidget(self.slider_cutoff_b)
@@ -553,35 +503,21 @@ class ComputerVisionApp(QMainWindow):
         # Top: Inputs using Custom ImageLabel
         top_row = QHBoxLayout()
         
-        container_a = QWidget()
-        layout_a = QVBoxLayout(container_a)
-        layout_a.setContentsMargins(0, 0, 0, 0)
-        self.lbl_hybrid_a = ImageLabel("Img A (Low Pass)\n(Double-Click to Load)")
-        self.lbl_hybrid_a.setObjectName("ImageDisplay")
-        self.lbl_hybrid_a.double_clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_a))
-        
         # We need a dedicated np array state for the intermediate filtered images to download
         self.hybrid_img_a_filtered_np = None
         self.hybrid_img_b_filtered_np = None
-        
-        btn_download_a = QPushButton("💾 Download A")
-        btn_download_a.setObjectName("SecondaryBtn")
-        btn_download_a.clicked.connect(lambda: self.download_image(self.hybrid_img_a_filtered_np if self.hybrid_img_a_filtered_np is not None else self.hybrid_img_a_np, "Image A"))
-        layout_a.addWidget(self.lbl_hybrid_a)
-        layout_a.addWidget(btn_download_a)
 
-        container_b = QWidget()
-        layout_b = QVBoxLayout(container_b)
-        layout_b.setContentsMargins(0, 0, 0, 0)
-        self.lbl_hybrid_b = ImageLabel("Img B (High Pass)\n(Double-Click to Load)")
-        self.lbl_hybrid_b.setObjectName("ImageDisplay")
-        self.lbl_hybrid_b.double_clicked.connect(lambda: self.handle_image_upload(self.lbl_hybrid_b))
-        
-        btn_download_b = QPushButton("💾 Download B")
-        btn_download_b.setObjectName("SecondaryBtn")
-        btn_download_b.clicked.connect(lambda: self.download_image(self.hybrid_img_b_filtered_np if self.hybrid_img_b_filtered_np is not None else self.hybrid_img_b_np, "Image B"))
-        layout_b.addWidget(self.lbl_hybrid_b)
-        layout_b.addWidget(btn_download_b)
+        container_a, self.lbl_hybrid_a, _ = self.create_hybrid_image_panel(
+            "Img A (Low Pass)\n(Double-Click to Load)", "💾 Download A",
+            lambda lbl: self.handle_image_upload(lbl),
+            lambda: self.download_image(self.hybrid_img_a_filtered_np if self.hybrid_img_a_filtered_np is not None else self.hybrid_img_a_np, "Image A")
+        )
+
+        container_b, self.lbl_hybrid_b, _ = self.create_hybrid_image_panel(
+            "Img B (High Pass)\n(Double-Click to Load)", "💾 Download B",
+            lambda lbl: self.handle_image_upload(lbl),
+            lambda: self.download_image(self.hybrid_img_b_filtered_np if self.hybrid_img_b_filtered_np is not None else self.hybrid_img_b_np, "Image B")
+        )
 
         top_row.addWidget(container_a)
         top_row.addWidget(container_b)
@@ -617,27 +553,45 @@ class ComputerVisionApp(QMainWindow):
     # --- HELPER FUNCTIONS ---
     # ==========================================
 
-    def update_kernel_label(self, val):
-        kernel_size = val * 2 + 3
-        self.lbl_kernel_val.setText(str(kernel_size))
+    def create_slider_widget(self, label_text, min_val, max_val, default_val, step=1, value_formatter=str):
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel(label_text))
+        lbl_val = QLabel(value_formatter(default_val))
+        layout.addWidget(lbl_val)
+        layout.addStretch()
 
-    def update_freq_radius_label(self, val):
-        self.lbl_freq_radius_val.setText(str(val))
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(min_val, max_val)
+        slider.setSingleStep(step)
+        slider.setValue(default_val)
+        
+        slider.valueChanged.connect(lambda val, l=lbl_val, f=value_formatter: l.setText(f(val)))
+        
+        return layout, slider, lbl_val
 
-    def update_noise_intensity_label(self, val):
-        self.lbl_noise_intensity_val.setText(str(val))
+    def create_hybrid_image_panel(self, placeholder_text, download_btn_text, upload_callback, download_callback):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        lbl = ImageLabel(placeholder_text)
+        lbl.setObjectName("ImageDisplay")
+        lbl.double_clicked.connect(lambda: upload_callback(lbl))
+        
+        btn_download = QPushButton(download_btn_text)
+        btn_download.setObjectName("SecondaryBtn")
+        btn_download.clicked.connect(download_callback)
+        
+        layout.addWidget(lbl)
+        layout.addWidget(btn_download)
+        
+        return container, lbl, btn_download
 
-    def update_cutoff_a_label(self, val):
-        self.lbl_cutoff_a_val.setText(str(val))
-
-    def update_cutoff_b_label(self, val):
-        self.lbl_cutoff_b_val.setText(str(val))
-
-    def update_canny_t1_label(self, val):
-        self.lbl_canny_t1_val.setText(str(val))
-
-    def update_canny_t2_label(self, val):
-        self.lbl_canny_t2_val.setText(str(val))
+    def _execute_image_op(self, operation, *args, **kwargs):
+        if self.current_image_np is None:
+            return
+        res = operation(self.current_image_np, *args, **kwargs)
+        self.set_processed_image(res)
 
     def toggle_canny_sliders(self, text):
         if text == "Canny":
@@ -799,68 +753,41 @@ class ComputerVisionApp(QMainWindow):
         self.canvas.draw()
 
     def apply_noise(self):
-        if self.current_image_np is None:
-            return
-            
         noise_type = self.combo_noise.currentText()
         intensity = self.slider_noise.value()
-        res = backend.add_noise(self.current_image_np, noise_type, intensity)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.add_noise, noise_type, intensity)
 
     def apply_filter(self):
-        if self.current_image_np is None:
-            return
-            
         filter_type = self.combo_filter.currentText()
         kernel_size = self.slider_kernel.value() * 2 + 3
-            
-        res = backend.apply_filter(self.current_image_np, filter_type, kernel_size)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.apply_filter, filter_type, kernel_size)
 
     def apply_edge(self):
-        if self.current_image_np is None:
-            return
-            
         method = self.combo_edge.currentText()
         if method == "Sobel":
-            res = backend.sobel(self.current_image_np)
+            self._execute_image_op(backend.sobel)
         elif method == "Roberts":
-            res = backend.roberts(self.current_image_np)
+            self._execute_image_op(backend.roberts)
         elif method == "Prewitt":
-            res = backend.prewitt(self.current_image_np)
+            self._execute_image_op(backend.prewitt)
         else:
             t1 = float(self.slider_canny_t1.value())
             t2 = float(self.slider_canny_t2.value())
-            res = backend.canny(self.current_image_np, t1, t2)
-            
-        self.set_processed_image(res)
+            self._execute_image_op(backend.canny, t1, t2)
 
     def apply_freq(self):
-        if self.current_image_np is None:
-            return
-            
         filter_type = "low_pass" if "Low" in self.combo_freq.currentText() else "high_pass"
         radius = self.slider_freq_radius.value()
-        res = backend.apply_fft(self.current_image_np, filter_type, radius)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.apply_fft, filter_type, radius)
 
     def apply_grayscale(self):
-        if self.current_image_np is None:
-            return
-        res = backend.to_grayscale(self.current_image_np)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.to_grayscale)
 
     def apply_equalize(self):
-        if self.current_image_np is None:
-            return
-        res = backend.equalize(self.current_image_np)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.equalize)
 
     def apply_normalize(self):
-        if self.current_image_np is None:
-            return
-        res = backend.normalize(self.current_image_np)
-        self.set_processed_image(res)
+        self._execute_image_op(backend.normalize)
 
     def apply_hybrid(self):
         if self.hybrid_img_a_np is None or self.hybrid_img_b_np is None:
