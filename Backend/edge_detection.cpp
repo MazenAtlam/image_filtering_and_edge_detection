@@ -1,19 +1,10 @@
-#include <opencv2/opencv.hpp>
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
-#include <cmath>
-
 #include "binding_utils.h"
+#include "intensity_data_info.h"
 
 // Detect Edge using Canny mask
     static cv::Mat detectEdgesCanny(const cv::Mat& image, double threshold1 = 100, double threshold2 = 200) {
-        cv::Mat gray, edges;
-        
-        if (image.channels() == 3) {
-            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
+        cv::Mat edges;
 
         // Apply Canny Edge Detection
         cv::Canny(gray, edges, threshold1, threshold2);
@@ -26,12 +17,7 @@
 
     // Helper for 3x3 convolution
     static cv::Mat apply3x3EdgeFilter(const cv::Mat& image, const int kx[3][3], const int ky[3][3]) {
-        cv::Mat gray;
-        if (image.channels() == 3) {
-            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         cv::Mat result = cv::Mat::zeros(gray.size(), CV_8UC1);
         cv::Mat padded;
@@ -75,12 +61,7 @@
 
     // Detect Edge using Roberts cross masks
     static cv::Mat detectEdgesRoberts(const cv::Mat& image) {
-        cv::Mat gray;
-        if (image.channels() == 3) {
-            cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = image.clone();
-        }
+        cv::Mat gray = IntensityDataInfo::convertToGrayscale(image);
 
         cv::Mat result = cv::Mat::zeros(gray.size(), CV_8UC1);
         cv::Mat padded;
