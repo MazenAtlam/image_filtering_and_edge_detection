@@ -173,7 +173,6 @@ class ComputerVisionApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CV Toolkit Pro")
-        self.showMaximized()
 
         # State mapping
         self.current_image_np = None
@@ -281,6 +280,8 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_noise = QComboBox()
         self.combo_noise.addItems(["Uniform Noise", "Gaussian Noise", "Salt & Pepper"])
+        self.combo_noise.installEventFilter(self)
+        self.combo_noise.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         noise_intensity_layout, self.slider_noise, self.lbl_noise_intensity_val = self.create_slider_widget(
             "Intensity:", 1, 100, 10
@@ -301,6 +302,8 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_filter = QComboBox()
         self.combo_filter.addItems(["Average Filter", "Gaussian Filter", "Median Filter"])
+        self.combo_filter.installEventFilter(self)
+        self.combo_filter.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         kernel_layout, self.slider_kernel, self.lbl_kernel_val = self.create_slider_widget(
             "Kernel Size:", 0, 14, 0, step=1, value_formatter=lambda v: str(v * 2 + 3)
         )
@@ -320,6 +323,8 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_edge = QComboBox()
         self.combo_edge.addItems(["Sobel", "Roberts", "Prewitt", "Canny"])
+        self.combo_edge.installEventFilter(self)
+        self.combo_edge.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.canny_controls_widget = QWidget()
         canny_layout = QVBoxLayout(self.canny_controls_widget)
@@ -368,6 +373,8 @@ class ComputerVisionApp(QMainWindow):
         l = QVBoxLayout()
         self.combo_freq = QComboBox()
         self.combo_freq.addItems(["Low Pass (Blur)", "High Pass (Sharpen)"])
+        self.combo_freq.installEventFilter(self)
+        self.combo_freq.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         freq_radius_layout, self.slider_freq_radius, self.lbl_freq_radius_val = self.create_slider_widget(
             "Cutoff Radius:", 10, 200, 30
@@ -577,6 +584,8 @@ class ComputerVisionApp(QMainWindow):
         slider.setRange(min_val, max_val)
         slider.setSingleStep(step)
         slider.setValue(default_val)
+        slider.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        slider.installEventFilter(self)
         
         slider.valueChanged.connect(lambda val, l=lbl_val, f=value_formatter: l.setText(f(val)))
         
@@ -835,6 +844,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Fusion style allows for better custom coloring
     window = ComputerVisionApp()
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec())
     
